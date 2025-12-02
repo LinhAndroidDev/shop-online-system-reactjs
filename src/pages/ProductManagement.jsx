@@ -11,6 +11,8 @@ const ProductManagement = () => {
   const [categories, setCategories] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [imagesPreview, setImagesPreview] = useState([]);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -18,10 +20,12 @@ const ProductManagement = () => {
     loadCategories();
   }, []);
 
+
   const loadProducts = () => {
     const data = productController.getAll();
     // Tạo array mới để đảm bảo React nhận ra sự thay đổi
-    setProducts([...data]);
+    // Map lại để đảm bảo mỗi object là một instance mới
+    setProducts(data.map(product => ({ ...product })));
   };
 
   const loadCategories = () => {
@@ -31,15 +35,22 @@ const ProductManagement = () => {
 
   const handleAdd = () => {
     setEditingProduct(null);
+    setThumbnailPreview(null);
+    setImagesPreview([]);
     form.resetFields();
     setIsModalVisible(true);
   };
 
   const handleEdit = (record) => {
     setEditingProduct(record);
+    const thumbnail = record.thumbnail || null;
+    const images = Array.isArray(record.images) ? record.images : [];
+    setThumbnailPreview(thumbnail);
+    setImagesPreview(images);
     form.setFieldsValue({
       ...record,
-      images: record.images || [],
+      thumbnail: thumbnail,
+      images: images,
     });
     setIsModalVisible(true);
   };
@@ -62,39 +73,82 @@ const ProductManagement = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      // Đảm bảo thumbnail và images từ preview state được lưu
+      // Sử dụng thumbnailPreview nếu có, nếu không thì dùng values.thumbnail
+      // Nếu thumbnailPreview được set thành null (đã xóa), thì dùng empty string
+      const submitData = {
+        ...values,
+        thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
+        images: imagesPreview.length > 0 ? imagesPreview : (values.images || []),
+      };
+      
       if (editingProduct) {
-        productController.update(editingProduct.id, values);
+        productController.update(editingProduct.id, submitData);
         message.success('Cập nhật sản phẩm thành công');
       } else {
-        productController.create(values);
+        productController.create(submitData);
         message.success('Thêm sản phẩm thành công');
       }
       setIsModalVisible(false);
+      setThumbnailPreview(null);
+      setImagesPreview([]);
       form.resetFields();
-      loadProducts();
+      // Force reload để đảm bảo UI được cập nhật
+      setTimeout(() => {
+        loadProducts();
+      }, 100);
     } catch (error) {
-      console.error('Validation failed:', error);
+      // Validation failed
     }
   };
 
   const handleImageUpload = (file, fileList, field) => {
+    // Kiểm tra file type
+    if (!file.type.startsWith('image/')) {
+      message.error('Vui lòng chọn file ảnh');
+      return false;
+    }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
-      if (field === 'thumbnail') {
-        form.setFieldsValue({ thumbnail: e.target.result });
-      } else {
-        const currentImages = form.getFieldValue('images') || [];
-        form.setFieldsValue({ images: [...currentImages, e.target.result] });
-      }
+      const imageData = e.target.result;
+      
+      // Sử dụng setTimeout để đảm bảo cập nhật state ngoài quá trình render
+      setTimeout(() => {
+        if (field === 'thumbnail') {
+          setThumbnailPreview(imageData);
+          form.setFieldsValue({ thumbnail: imageData });
+        } else if (field === 'images') {
+          // Sử dụng functional update để đảm bảo lấy state mới nhất
+          setImagesPreview((prevImages) => {
+            const newImages = [...prevImages, imageData];
+            // Cập nhật form value sau khi state đã được cập nhật
+            setTimeout(() => {
+              form.setFieldsValue({ images: newImages });
+            }, 0);
+            return newImages;
+          });
+        }
+      }, 0);
+    };
+    reader.onerror = () => {
+      message.error('Lỗi khi đọc file ảnh');
     };
     reader.readAsDataURL(file);
     return false; // Prevent auto upload
   };
 
   const handleRemoveImage = (index) => {
-    const currentImages = form.getFieldValue('images') || [];
-    currentImages.splice(index, 1);
-    form.setFieldsValue({ images: currentImages });
+    // Sử dụng functional update để tránh lỗi state transition
+    setImagesPreview((prevImages) => {
+      const newImages = [...prevImages];
+      newImages.splice(index, 1);
+      // Cập nhật form value sau khi state đã được cập nhật
+      setTimeout(() => {
+        form.setFieldsValue({ images: newImages });
+      }, 0);
+      return newImages;
+    });
   };
 
   const columns = [
@@ -196,6 +250,8 @@ const ProductManagement = () => {
           onOk={handleSubmit}
           onCancel={() => {
             setIsModalVisible(false);
+            setThumbnailPreview(null);
+            setImagesPreview([]);
             form.resetFields();
           }}
           okText="Lưu"
@@ -262,13 +318,25 @@ const ProductManagement = () => {
               >
                 <Button icon={<UploadOutlined />}>Chọn ảnh thumbnail</Button>
               </Upload>
-              {form.getFieldValue('thumbnail') && (
+              {thumbnailPreview && (
                 <div style={{ marginTop: 10 }}>
                   <Image
                     width={100}
-                    src={form.getFieldValue('thumbnail')}
+                    src={thumbnailPreview}
                     alt="thumbnail"
+                    style={{ borderRadius: '4px' }}
                   />
+                  <Button
+                    danger
+                    size="small"
+                    style={{ marginTop: 5 }}
+                    onClick={() => {
+                      setThumbnailPreview(null);
+                      form.setFieldsValue({ thumbnail: '' });
+                    }}
+                  >
+                    Xóa ảnh
+                  </Button>
                 </div>
               )}
             </Form.Item>
@@ -279,28 +347,46 @@ const ProductManagement = () => {
               <Upload
                 beforeUpload={(file) => handleImageUpload(file, [], 'images')}
                 showUploadList={false}
+                accept="image/*"
               >
                 <Button icon={<UploadOutlined />}>Thêm ảnh mô tả</Button>
               </Upload>
-              <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {(form.getFieldValue('images') || []).map((img, index) => (
-                  <div key={index} style={{ position: 'relative' }}>
-                    <Image
-                      width={100}
-                      height={100}
-                      src={img}
-                      style={{ objectFit: 'cover' }}
-                    />
-                    <Button
-                      danger
-                      size="small"
-                      style={{ position: 'absolute', top: 0, right: 0 }}
-                      onClick={() => handleRemoveImage(index)}
-                    >
-                      X
-                    </Button>
+              <div style={{ marginTop: 10 }} key={`images-preview-${imagesPreview.length}`}>
+                {Array.isArray(imagesPreview) && imagesPreview.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {imagesPreview.map((img, index) => {
+                      if (!img) return null;
+                      return (
+                        <div key={`img-preview-${index}-${Date.now()}`} style={{ position: 'relative', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '4px', backgroundColor: '#fff' }}>
+                          <Image
+                            width={100}
+                            height={100}
+                            src={img}
+                            style={{ objectFit: 'cover', borderRadius: '4px', display: 'block' }}
+                            preview={false}
+                            alt={`Ảnh mô tả ${index + 1}`}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                          <Button
+                            danger
+                            size="small"
+                            type="primary"
+                            style={{ position: 'absolute', top: 4, right: 4, minWidth: '24px', height: '24px', padding: 0, zIndex: 10 }}
+                            onClick={() => handleRemoveImage(index)}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                ) : (
+                  <div style={{ color: '#999', fontSize: '12px', marginTop: 5 }}>
+                    Chưa có ảnh mô tả. Click nút "Thêm ảnh mô tả" để thêm.
+                  </div>
+                )}
               </div>
             </Form.Item>
           </Form>
