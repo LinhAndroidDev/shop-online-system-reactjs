@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Select, message, Space, Tag, Descriptions } from 'antd';
-import { EyeOutlined, MailOutlined, BellOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Select, message, Space, Tag, Descriptions, Dropdown } from 'antd';
+import { EyeOutlined, MailOutlined, BellOutlined, MoreOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import orderController from '../controllers/OrderController';
 import colors from '../config/colors';
@@ -115,44 +115,74 @@ const OrderManagement = () => {
     {
       title: 'Thao tác',
       key: 'action',
-      render: (_, record) => (
-        <Space wrap>
-          <Button
-            type="primary"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewDetail(record)}
-            size="small"
-          >
-            Chi tiết
-          </Button>
-          <Select
-            value={record.status}
-            onChange={(value) => handleStatusChange(record.id, value)}
-            style={{ width: isMobile ? 120 : 150 }}
-            size="small"
-          >
-            <Select.Option value="pending">Chờ xử lý</Select.Option>
-            <Select.Option value="processing">Đang xử lý</Select.Option>
-            <Select.Option value="shipping">Đang giao hàng</Select.Option>
-            <Select.Option value="completed">Hoàn thành</Select.Option>
-            <Select.Option value="cancelled">Đã hủy</Select.Option>
-          </Select>
-          <Button
-            icon={<MailOutlined />}
-            onClick={() => handleSendEmail(record.id)}
-            size="small"
-          >
-            Email
-          </Button>
-          <Button
-            icon={<BellOutlined />}
-            onClick={() => handleSendNotification(record.id)}
-            size="small"
-          >
-            Thông báo
-          </Button>
-        </Space>
-      ),
+      render: (_, record) => {
+        const menuItems = [
+          {
+            key: 'email',
+            label: (
+              <span>
+                <MailOutlined style={{ marginRight: 8 }} />
+                Gửi Email
+              </span>
+            ),
+            onClick: () => handleSendEmail(record.id),
+          },
+          {
+            key: 'notification',
+            label: (
+              <span>
+                <BellOutlined style={{ marginRight: 8 }} />
+                Gửi Thông báo
+              </span>
+            ),
+            onClick: () => handleSendNotification(record.id),
+          },
+        ];
+
+        return (
+          <Space wrap>
+            <Button
+              type="primary"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewDetail(record)}
+              size="small"
+            >
+              Chi tiết
+            </Button>
+            <Select
+              value={record.status}
+              onChange={(value) => handleStatusChange(record.id, value)}
+              style={{ width: isMobile ? 120 : 150 }}
+              size="small"
+            >
+              <Select.Option value="pending">Chờ xử lý</Select.Option>
+              <Select.Option value="processing">Đang xử lý</Select.Option>
+              <Select.Option value="shipping">Đang giao hàng</Select.Option>
+              <Select.Option value="completed">Hoàn thành</Select.Option>
+              <Select.Option value="cancelled">Đã hủy</Select.Option>
+            </Select>
+            <Dropdown
+              menu={{ items: menuItems }}
+              trigger={['click', 'hover']}
+              placement="bottomRight"
+            >
+              <Button
+                type="text"
+                icon={<MoreOutlined />}
+                size="small"
+                style={{
+                  padding: '4px 8px',
+                  minWidth: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              />
+            </Dropdown>
+          </Space>
+        );
+      },
     },
   ];
 
