@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, Upload, message, Space, Tag, Image } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import productController from '../controllers/ProductController';
 import categoryController from '../controllers/CategoryController';
@@ -312,33 +312,65 @@ const ProductManagement = () => {
               name="thumbnail"
               label="Ảnh thumbnail"
             >
-              <Upload
-                beforeUpload={(file) => handleImageUpload(file, [], 'thumbnail')}
-                showUploadList={false}
-              >
-                <Button icon={<UploadOutlined />}>Chọn ảnh thumbnail</Button>
-              </Upload>
-              {thumbnailPreview && (
-                <div style={{ marginTop: 10 }}>
-                  <Image
-                    width={100}
-                    src={thumbnailPreview}
-                    alt="thumbnail"
-                    style={{ borderRadius: '4px' }}
-                  />
-                  <Button
-                    danger
-                    size="small"
-                    style={{ marginTop: 5 }}
-                    onClick={() => {
-                      setThumbnailPreview(null);
-                      form.setFieldsValue({ thumbnail: '' });
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Upload
+                  beforeUpload={(file) => handleImageUpload(file, [], 'thumbnail')}
+                  showUploadList={false}
+                >
+                  <Button icon={<UploadOutlined />}>Chọn ảnh thumbnail</Button>
+                </Upload>
+                {thumbnailPreview && (
+                  <div 
+                    style={{ position: 'relative', display: 'inline-block', width: 'fit-content' }}
+                    onMouseEnter={(e) => {
+                      const btn = e.currentTarget.querySelector('button');
+                      if (btn) btn.style.opacity = '1';
+                    }}
+                    onMouseLeave={(e) => {
+                      const btn = e.currentTarget.querySelector('button');
+                      if (btn) btn.style.opacity = '0.6';
                     }}
                   >
-                    Xóa ảnh
-                  </Button>
-                </div>
-              )}
+                    <Image
+                      width={120}
+                      height={120}
+                      src={thumbnailPreview}
+                      alt="thumbnail"
+                      style={{ 
+                        borderRadius: '8px',
+                        objectFit: 'cover',
+                        border: '1px solid #d9d9d9',
+                        display: 'block'
+                      }}
+                    />
+                    <Button
+                      size="small"
+                      icon={<CloseOutlined style={{ color: '#fff' }} />}
+                      style={{ 
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        minWidth: '28px',
+                        height: '28px',
+                        padding: 0,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        border: 'none',
+                        opacity: 0.6,
+                        transition: 'opacity 0.3s ease',
+                        zIndex: 10
+                      }}
+                      onClick={() => {
+                        setThumbnailPreview(null);
+                        form.setFieldsValue({ thumbnail: '' });
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </Form.Item>
             <Form.Item
               name="images"
@@ -357,13 +389,41 @@ const ProductManagement = () => {
                     {imagesPreview.map((img, index) => {
                       if (!img) return null;
                       return (
-                        <div key={`img-preview-${index}-${Date.now()}`} style={{ position: 'relative', border: '1px solid #d9d9d9', borderRadius: '4px', padding: '4px', backgroundColor: '#fff' }}>
+                        <div 
+                          key={`img-preview-${index}-${Date.now()}`} 
+                          style={{ 
+                            position: 'relative', 
+                            border: '1px solid #d9d9d9', 
+                            borderRadius: '4px', 
+                            padding: '4px', 
+                            backgroundColor: '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = colors.primary;
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(24, 144, 255, 0.2)';
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#d9d9d9';
+                            e.currentTarget.style.boxShadow = 'none';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                        >
                           <Image
                             width={100}
                             height={100}
                             src={img}
-                            style={{ objectFit: 'cover', borderRadius: '4px', display: 'block' }}
-                            preview={false}
+                            style={{ 
+                              objectFit: 'cover', 
+                              borderRadius: '4px', 
+                              display: 'block',
+                              cursor: 'pointer',
+                            }}
+                            preview={{
+                              mask: 'Xem ảnh',
+                            }}
                             alt={`Ảnh mô tả ${index + 1}`}
                             onError={(e) => {
                               e.target.style.display = 'none';
@@ -374,7 +434,10 @@ const ProductManagement = () => {
                             size="small"
                             type="primary"
                             style={{ position: 'absolute', top: 4, right: 4, minWidth: '24px', height: '24px', padding: 0, zIndex: 10 }}
-                            onClick={() => handleRemoveImage(index)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage(index);
+                            }}
                           >
                             ×
                           </Button>
