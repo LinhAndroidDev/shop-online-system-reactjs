@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, message, Space, Tag } from 'antd';
+import { Table, Button, Modal, Form, Input, message, Space } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
-import categoryController from '../controllers/CategoryController';
 import colors from '../config/colors';
+
+const CATEGORY_API = 'http://localhost:8080/api/category';
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
@@ -12,13 +13,23 @@ const CategoryManagement = () => {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    loadCategories();
+    fetchCategories();
   }, []);
 
-  const loadCategories = () => {
-    const data = categoryController.getAll();
-    // Tạo array mới để đảm bảo React nhận ra sự thay đổi
-    setCategories([...data]);
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(CATEGORY_API);
+      const json = await res.json();
+      if (json.status === 200 && Array.isArray(json.data)) {
+        setCategories(json.data);
+      } else {
+        message.error(json.message || 'Không thể tải danh mục');
+      }
+    } catch (error) {
+      message.error('Lỗi khi gọi API danh mục');
+      // eslint-disable-next-line no-console
+      console.error('Fetch categories error:', error);
+    }
   };
 
   const handleAdd = () => {
@@ -39,14 +50,18 @@ const CategoryManagement = () => {
       content: 'Bạn có chắc chắn muốn xóa danh mục này?',
       onOk: async () => {
         try {
-          if (categoryController.delete(id)) {
+          const res = await fetch(`${CATEGORY_API}/${id}`, {
+            method: 'DELETE',
+          });
+          const json = await res.json();
+          if (json.status === 200) {
             message.success('Xóa danh mục thành công');
-            // Đảm bảo state được cập nhật ngay lập tức
-            loadCategories();
+            await fetchCategories();
           } else {
-            message.error('Xóa danh mục thất bại');
+            message.error(json.message || 'Xóa danh mục thất bại');
           }
         } catch (error) {
+          // eslint-disable-next-line no-console
           console.error('Delete error:', error);
           message.error('Xóa danh mục thất bại');
         }
@@ -58,16 +73,46 @@ const CategoryManagement = () => {
     try {
       const values = await form.validateFields();
       if (editingCategory) {
-        categoryController.update(editingCategory.id, values);
-        message.success('Cập nhật danh mục thành công');
+        const res = await fetch(CATEGORY_API, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: editingCategory.id,
+            name: values.name,
+          }),
+        });
+        const json = await res.json();
+        if (json.status === 200) {
+          message.success('Cập nhật danh mục thành công');
+        } else {
+          message.error(json.message || 'Cập nhật danh mục thất bại');
+          return;
+        }
       } else {
-        categoryController.create(values);
-        message.success('Thêm danh mục thành công');
+        const res = await fetch(CATEGORY_API, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: values.name,
+          }),
+        });
+        const json = await res.json();
+        if (json.status === 200) {
+          message.success('Thêm danh mục thành công');
+        } else {
+          message.error(json.message || 'Thêm danh mục thất bại');
+          return;
+        }
       }
       setIsModalVisible(false);
       form.resetFields();
-      loadCategories();
+      await fetchCategories();
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Validation failed:', error);
     }
   };
