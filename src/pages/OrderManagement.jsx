@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Select, message, Space, Tag, Descriptions, Badge } from 'antd';
+import { Table, Button, Modal, Select, message, Space, Tag, Descriptions } from 'antd';
 import { EyeOutlined, MailOutlined, BellOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import orderController from '../controllers/OrderController';
@@ -10,6 +10,15 @@ const OrderManagement = () => {
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     loadOrders();
@@ -107,18 +116,20 @@ const OrderManagement = () => {
       title: 'Thao tác',
       key: 'action',
       render: (_, record) => (
-        <Space>
+        <Space wrap>
           <Button
             type="primary"
             icon={<EyeOutlined />}
             onClick={() => handleViewDetail(record)}
+            size="small"
           >
             Chi tiết
           </Button>
           <Select
             value={record.status}
             onChange={(value) => handleStatusChange(record.id, value)}
-            style={{ width: 150 }}
+            style={{ width: isMobile ? 120 : 150 }}
+            size="small"
           >
             <Select.Option value="pending">Chờ xử lý</Select.Option>
             <Select.Option value="processing">Đang xử lý</Select.Option>
@@ -129,12 +140,14 @@ const OrderManagement = () => {
           <Button
             icon={<MailOutlined />}
             onClick={() => handleSendEmail(record.id)}
+            size="small"
           >
             Email
           </Button>
           <Button
             icon={<BellOutlined />}
             onClick={() => handleSendNotification(record.id)}
+            size="small"
           >
             Thông báo
           </Button>
@@ -146,12 +159,19 @@ const OrderManagement = () => {
   return (
     <MainLayout>
       <div>
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Quản lý Đơn hàng</h2>
+        <div style={{ 
+          marginBottom: '20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <h2 style={{ margin: 0 }}>Quản lý Đơn hàng</h2>
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 200 }}
+            style={{ width: isMobile ? '100%' : 200 }}
           >
             <Select.Option value="all">Tất cả</Select.Option>
             <Select.Option value="pending">Chờ xử lý</Select.Option>
@@ -167,6 +187,8 @@ const OrderManagement = () => {
           dataSource={orders}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal
@@ -174,11 +196,11 @@ const OrderManagement = () => {
           open={isDetailModalVisible}
           onCancel={() => setIsDetailModalVisible(false)}
           footer={null}
-          width={800}
+          width={isMobile ? '95%' : 800}
         >
           {selectedOrder && (
             <div>
-              <Descriptions bordered column={2}>
+              <Descriptions bordered column={isMobile ? 1 : 2}>
                 <Descriptions.Item label="Mã đơn hàng">
                   {selectedOrder.id}
                 </Descriptions.Item>

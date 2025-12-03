@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import colors from '../../config/colors';
 
-const Sidebar = () => {
+const Sidebar = ({ collapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,37 +19,37 @@ const Sidebar = () => {
     {
       key: '/categories',
       icon: <AppstoreOutlined />,
-      label: 'Quản lý Danh mục',
+      label: collapsed ? '' : 'Quản lý Danh mục',
     },
     {
       key: '/products',
       icon: <ShoppingOutlined />,
-      label: 'Quản lý Sản phẩm',
+      label: collapsed ? '' : 'Quản lý Sản phẩm',
     },
     {
       key: '/inventory',
       icon: <DatabaseOutlined />,
-      label: 'Quản lý Kho',
+      label: collapsed ? '' : 'Quản lý Kho',
     },
     {
       key: '/orders',
       icon: <ShoppingCartOutlined />,
-      label: 'Quản lý Đơn hàng',
+      label: collapsed ? '' : 'Quản lý Đơn hàng',
     },
     {
       key: '/customers',
       icon: <UserOutlined />,
-      label: 'Quản lý Khách hàng',
+      label: collapsed ? '' : 'Quản lý Khách hàng',
     },
     {
       key: '/shipping',
       icon: <TruckOutlined />,
-      label: 'Quản lý Vận chuyển',
+      label: collapsed ? '' : 'Quản lý Vận chuyển',
     },
     {
       key: '/payments',
       icon: <DollarOutlined />,
-      label: 'Quản lý Thanh toán',
+      label: collapsed ? '' : 'Quản lý Thanh toán',
     },
   ];
 
@@ -64,6 +64,7 @@ const Sidebar = () => {
         borderRight: 0,
         backgroundColor: colors.background.white,
       }}
+      inlineCollapsed={collapsed}
     />
   );
 };

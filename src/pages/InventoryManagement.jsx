@@ -17,11 +17,18 @@ const InventoryManagement = () => {
   const [stockType, setStockType] = useState('in'); // 'in' or 'out'
   const [form] = Form.useForm();
   const [stockForm] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     // Đồng bộ inventory với sản phẩm mỗi khi load
     inventoryController.syncWithProducts();
     loadInventories();
+    
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const loadInventories = () => {
@@ -232,9 +239,16 @@ const InventoryManagement = () => {
   return (
     <MainLayout>
       <div>
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Quản lý Kho</h2>
-          <Space>
+        <div style={{ 
+          marginBottom: '20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <h2 style={{ margin: 0 }}>Quản lý Kho</h2>
+          <Space wrap>
             <Button
               type="primary"
               danger
@@ -291,6 +305,8 @@ const InventoryManagement = () => {
           dataSource={inventories}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal
@@ -354,7 +370,7 @@ const InventoryManagement = () => {
               Đóng
             </Button>,
           ]}
-          width={800}
+          width={isMobile ? '95%' : 800}
         >
           <Alert
             message={`Có tổng cộng ${outOfStockItems.length} sản phẩm đã hết hàng`}
@@ -380,7 +396,7 @@ const InventoryManagement = () => {
               Đóng
             </Button>,
           ]}
-          width={800}
+          width={isMobile ? '95%' : 800}
         >
           <Alert
             message={`Có tổng cộng ${lowStockItems.length} sản phẩm có tồn kho thấp`}

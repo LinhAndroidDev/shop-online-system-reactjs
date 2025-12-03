@@ -122,8 +122,15 @@ const CategoryManagement = () => {
   return (
     <MainLayout>
       <div>
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Quản lý Danh mục</h2>
+        <div style={{ 
+          marginBottom: '20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <h2 style={{ margin: 0 }}>Quản lý Danh mục</h2>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -139,6 +146,8 @@ const CategoryManagement = () => {
           dataSource={categories}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal

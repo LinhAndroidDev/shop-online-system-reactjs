@@ -13,9 +13,16 @@ const ShippingManagement = () => {
   const [editingShipment, setEditingShipment] = useState(null);
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     loadShipments();
+    
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const loadShipments = () => {
@@ -156,6 +163,8 @@ const ShippingManagement = () => {
           dataSource={shipments}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal
@@ -198,7 +207,7 @@ const ShippingManagement = () => {
           open={isDetailModalVisible}
           onCancel={() => setIsDetailModalVisible(false)}
           footer={null}
-          width={700}
+          width={isMobile ? '95%' : 700}
         >
           {selectedShipment && (
             <Descriptions bordered column={2}>

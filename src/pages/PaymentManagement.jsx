@@ -15,12 +15,21 @@ const PaymentManagement = () => {
   const [payments, setPayments] = useState([]);
   const [dateRange, setDateRange] = useState([dayjs().startOf('month'), dayjs().endOf('month')]);
   const [revenueByProduct, setRevenueByProduct] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [summary, setSummary] = useState({
     totalRevenue: 0,
     refundedAmount: 0,
     cancelledRevenue: 0,
     totalProfit: 0,
   });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     loadPayments();
@@ -153,11 +162,12 @@ const PaymentManagement = () => {
               }
             }}
             format="DD/MM/YYYY"
+            style={{ width: isMobile ? '100%' : 'auto' }}
           />
         </div>
 
-        <Row gutter={16} style={{ marginBottom: '20px' }}>
-          <Col span={6}>
+        <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
+          <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
                 title="Tổng doanh thu"
@@ -168,7 +178,7 @@ const PaymentManagement = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
                 title="Đã hoàn tiền"
@@ -179,7 +189,7 @@ const PaymentManagement = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
                 title="Đơn hàng hủy"
@@ -190,7 +200,7 @@ const PaymentManagement = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
                 title="Lợi nhuận"
@@ -203,25 +213,27 @@ const PaymentManagement = () => {
           </Col>
         </Row>
 
-        <Row gutter={16}>
-          <Col span={12}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={12}>
             <Card title="Báo cáo doanh thu theo sản phẩm" style={{ marginBottom: '20px' }}>
               <Table
                 columns={revenueColumns}
                 dataSource={revenueByProduct}
                 rowKey="productId"
                 pagination={{ pageSize: 10 }}
+                scroll={{ x: 'max-content' }}
                 size="small"
               />
             </Card>
           </Col>
-          <Col span={12}>
+          <Col xs={24} lg={12}>
             <Card title="Danh sách thanh toán">
               <Table
                 columns={paymentColumns}
                 dataSource={payments}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
+                scroll={{ x: 'max-content' }}
                 size="small"
               />
             </Card>

@@ -10,6 +10,15 @@ const CustomerManagement = () => {
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     loadCustomers();
@@ -168,6 +177,8 @@ const CustomerManagement = () => {
           dataSource={customers}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal
@@ -175,7 +186,7 @@ const CustomerManagement = () => {
           open={isDetailModalVisible}
           onCancel={() => setIsDetailModalVisible(false)}
           footer={null}
-          width={800}
+          width={isMobile ? '95%' : 800}
         >
           {selectedCustomer && (
             <Tabs

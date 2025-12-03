@@ -14,10 +14,17 @@ const ProductManagement = () => {
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [imagesPreview, setImagesPreview] = useState([]);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     loadProducts();
     loadCategories();
+    
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
 
@@ -225,8 +232,15 @@ const ProductManagement = () => {
   return (
     <MainLayout>
       <div>
-        <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Quản lý Sản phẩm</h2>
+        <div style={{ 
+          marginBottom: '20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <h2 style={{ margin: 0 }}>Quản lý Sản phẩm</h2>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -242,6 +256,8 @@ const ProductManagement = () => {
           dataSource={products}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 'max-content' }}
+          size="small"
         />
 
         <Modal
@@ -256,7 +272,7 @@ const ProductManagement = () => {
           }}
           okText="Lưu"
           cancelText="Hủy"
-          width={800}
+          width={isMobile ? '95%' : 800}
         >
           <Form form={form} layout="vertical">
             <Form.Item
