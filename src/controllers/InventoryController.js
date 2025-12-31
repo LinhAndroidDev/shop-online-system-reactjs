@@ -4,6 +4,7 @@ import productController from './ProductController';
 
 class InventoryController {
   constructor() {
+    this.baseUrl = 'http://localhost:8080/api/inventory';
     this.inventories = this.loadFromStorage();
     this._initialized = false;
   }
@@ -43,23 +44,27 @@ class InventoryController {
     }
   }
 
-  getAll() {
-    // Khởi tạo nếu chưa khởi tạo
-    this.initializeInventories();
-    
-    // Chỉ hiển thị inventory của các sản phẩm còn tồn tại
-    const products = productController.getAll();
-    const productIds = new Set(products.map(p => p.id));
-    
-    return this.inventories
-      .filter(inv => productIds.has(inv.productId))
-      .map(inv => {
-        const product = productController.getById(inv.productId);
-        return {
-          ...inv,
-          productName: product ? product.name : 'N/A',
-        };
-      });
+  async getAll() {
+    try {
+      const response = await fetch(this.baseUrl);
+      const result = await response.json();
+      
+      if (result.status === 200 && Array.isArray(result.data)) {
+        // Map dữ liệu từ API - productName lấy từ product object trong response
+        return result.data.map((item) => {
+          return {
+            ...item,
+            productId: item.product?.id || item.productId,
+            productName: item.product?.name || 'N/A',
+            lastUpdated: item.updatedAt || item.lastUpdated,
+          };
+        });
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching inventories:', error);
+      return [];
+    }
   }
 
   getByProductId(productId) {
@@ -82,55 +87,79 @@ class InventoryController {
     return inventory;
   }
 
-  updateQuantity(productId, quantity, type = 'set') {
-    let inventory = this.getByProductId(productId);
-    if (inventory) {
-      if (type === 'set') {
-        inventory.quantity = quantity;
-      } else if (type === 'add') {
-        inventory.quantity += quantity;
-      } else if (type === 'subtract') {
-        inventory.quantity = Math.max(0, inventory.quantity - quantity);
+  async updateQuantity(inventoryId, quantity) {
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: inventoryId,
+          quantity: Number(quantity),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.status === 200) {
+        // Response có thể là array hoặc object
+        const inventoryData = Array.isArray(result.data) ? result.data[0] : result.data;
+        
+        if (inventoryData) {
+          // Map với productName từ product object trong response
+          return {
+            ...inventoryData,
+            productId: inventoryData.product?.id || inventoryData.productId,
+            productName: inventoryData.product?.name || 'N/A',
+            lastUpdated: inventoryData.updatedAt || inventoryData.lastUpdated,
+          };
+        }
+        
+        return result.data || {};
       }
-      inventory.lastUpdated = new Date().toISOString();
-      this.saveToStorage();
-      return inventory;
+      
+      throw new Error(result.message || `Cập nhật số lượng thất bại (Status: ${result.status})`);
+    } catch (error) {
+      console.error('Error updating inventory quantity:', error);
+      throw error;
     }
-    return null;
   }
 
-  stockIn(productId, quantity) {
-    return this.updateQuantity(productId, quantity, 'add');
-  }
-
-  stockOut(productId, quantity) {
-    return this.updateQuantity(productId, quantity, 'subtract');
-  }
-
-  getLowStockItems() {
-    // Khởi tạo nếu chưa khởi tạo
-    this.initializeInventories();
+  async stockIn(inventoryId, quantity) {
+    // Lấy inventory hiện tại để tính số lượng mới
+    const inventories = await this.getAll();
+    const currentInventory = inventories.find(inv => inv.id === inventoryId);
     
-    // Chỉ lấy sản phẩm còn tồn tại
-    const products = productController.getAll();
-    const productIds = new Set(products.map(p => p.id));
+    if (currentInventory) {
+      const newQuantity = currentInventory.quantity + Number(quantity);
+      return await this.updateQuantity(inventoryId, newQuantity);
+    }
+    throw new Error('Không tìm thấy inventory');
+  }
+
+  async stockOut(inventoryId, quantity) {
+    // Lấy inventory hiện tại để tính số lượng mới
+    const inventories = await this.getAll();
+    const currentInventory = inventories.find(inv => inv.id === inventoryId);
     
-    return this.inventories.filter(inv => {
-      return productIds.has(inv.productId) && inv.quantity > 0 && inv.quantity <= inv.minStock;
+    if (currentInventory) {
+      const newQuantity = Math.max(0, currentInventory.quantity - Number(quantity));
+      return await this.updateQuantity(inventoryId, newQuantity);
+    }
+    throw new Error('Không tìm thấy inventory');
+  }
+
+  async getLowStockItems() {
+    const inventories = await this.getAll();
+    return inventories.filter(inv => {
+      return inv.quantity > 0 && inv.quantity <= (inv.minStock || 0);
     });
   }
 
-  getOutOfStockItems() {
-    // Khởi tạo nếu chưa khởi tạo
-    this.initializeInventories();
-    
-    // Chỉ lấy sản phẩm còn tồn tại
-    const products = productController.getAll();
-    const productIds = new Set(products.map(p => p.id));
-    
-    return this.inventories.filter(inv => {
-      return productIds.has(inv.productId) && inv.quantity === 0;
-    });
+  async getOutOfStockItems() {
+    const inventories = await this.getAll();
+    return inventories.filter(inv => inv.quantity === 0);
   }
 
   deleteByProductId(productId) {

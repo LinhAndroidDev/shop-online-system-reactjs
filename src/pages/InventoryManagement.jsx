@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, InputNumber, message, Space, Tag, Card, Statistic, Alert } from 'antd';
-import { EditOutlined, PlusOutlined, MinusOutlined, WarningOutlined, DatabaseOutlined, FileTextOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, MinusOutlined, WarningOutlined, DatabaseOutlined, FileTextOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import inventoryController from '../controllers/InventoryController';
 import colors from '../config/colors';
@@ -9,19 +9,15 @@ const InventoryManagement = () => {
   const [inventories, setInventories] = useState([]);
   const [lowStockItems, setLowStockItems] = useState([]);
   const [outOfStockItems, setOutOfStockItems] = useState([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
   const [isStockModalVisible, setIsStockModalVisible] = useState(false);
   const [isOutOfStockReportVisible, setIsOutOfStockReportVisible] = useState(false);
   const [isLowStockReportVisible, setIsLowStockReportVisible] = useState(false);
   const [editingInventory, setEditingInventory] = useState(null);
   const [stockType, setStockType] = useState('in'); // 'in' or 'out'
-  const [form] = Form.useForm();
   const [stockForm] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
-    // Đồng bộ inventory với sản phẩm mỗi khi load
-    inventoryController.syncWithProducts();
     loadInventories();
     
     const handleResize = () => {
@@ -31,17 +27,19 @@ const InventoryManagement = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const loadInventories = () => {
-    const data = inventoryController.getAll();
-    setInventories(data);
-    setLowStockItems(inventoryController.getLowStockItems());
-    setOutOfStockItems(inventoryController.getOutOfStockItems());
-  };
-
-  const handleUpdateQuantity = (record) => {
-    setEditingInventory(record);
-    form.setFieldsValue({ quantity: record.quantity });
-    setIsModalVisible(true);
+  const loadInventories = async () => {
+    try {
+      const data = await inventoryController.getAll();
+      setInventories(data);
+      
+      const lowStock = await inventoryController.getLowStockItems();
+      setLowStockItems(lowStock);
+      
+      const outOfStock = await inventoryController.getOutOfStockItems();
+      setOutOfStockItems(outOfStock);
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách tồn kho: ' + error.message);
+    }
   };
 
   const handleStockIn = (record) => {
@@ -58,34 +56,21 @@ const InventoryManagement = () => {
     setIsStockModalVisible(true);
   };
 
-  const handleUpdateQuantitySubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      inventoryController.updateQuantity(editingInventory.productId, values.quantity, 'set');
-      message.success('Cập nhật số lượng thành công');
-      setIsModalVisible(false);
-      form.resetFields();
-      loadInventories();
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
   const handleStockSubmit = async () => {
     try {
       const values = await stockForm.validateFields();
       if (stockType === 'in') {
-        inventoryController.stockIn(editingInventory.productId, values.quantity);
+        await inventoryController.stockIn(editingInventory.id, values.quantity);
         message.success('Nhập kho thành công');
       } else {
-        inventoryController.stockOut(editingInventory.productId, values.quantity);
+        await inventoryController.stockOut(editingInventory.id, values.quantity);
         message.success('Xuất kho thành công');
       }
       setIsStockModalVisible(false);
       stockForm.resetFields();
-      loadInventories();
+      await loadInventories();
     } catch (error) {
-      console.error('Validation failed:', error);
+      message.error((stockType === 'in' ? 'Nhập kho' : 'Xuất kho') + ' thất bại: ' + error.message);
     }
   };
 
@@ -134,13 +119,6 @@ const InventoryManagement = () => {
       key: 'action',
       render: (_, record) => (
         <Space>
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => handleUpdateQuantity(record)}
-          >
-            Sửa số lượng
-          </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -308,32 +286,6 @@ const InventoryManagement = () => {
           scroll={{ x: 'max-content' }}
           size="small"
         />
-
-        <Modal
-          title="Cập nhật số lượng"
-          open={isModalVisible}
-          onOk={handleUpdateQuantitySubmit}
-          onCancel={() => {
-            setIsModalVisible(false);
-            form.resetFields();
-          }}
-          okText="Lưu"
-          cancelText="Hủy"
-        >
-          <Form form={form} layout="vertical">
-            <Form.Item
-              name="quantity"
-              label="Số lượng"
-              rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
-            >
-              <InputNumber
-                style={{ width: '100%' }}
-                min={0}
-                placeholder="Nhập số lượng"
-              />
-            </Form.Item>
-          </Form>
-        </Modal>
 
         <Modal
           title={stockType === 'in' ? 'Nhập kho' : 'Xuất kho'}
