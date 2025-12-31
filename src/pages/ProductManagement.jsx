@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, Upload, message, Space, Tag, Image } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
@@ -13,6 +13,9 @@ const ProductManagement = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [imagesPreview, setImagesPreview] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(new Map()); // Map<fileKey, { status: 'uploading'|'success'|'error', url?: string, file?: File }>
+  const processedFilesRef = useRef(new Set()); // Ref để track các file đã được xử lý
+  const lastFileListLengthRef = useRef(0); // Track số lượng file lần trước để tránh xử lý trùng
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -55,6 +58,9 @@ const ProductManagement = () => {
     setEditingProduct(null);
     setThumbnailPreview(null);
     setImagesPreview([]);
+    setUploadingImages(new Map());
+    processedFilesRef.current.clear();
+    lastFileListLengthRef.current = 0;
     form.resetFields();
     setIsModalVisible(true);
   };
@@ -125,6 +131,8 @@ const ProductManagement = () => {
       setIsModalVisible(false);
       setThumbnailPreview(null);
       setImagesPreview([]);
+      setUploadingImages(new Map());
+      processedFilesRef.current.clear();
       form.resetFields();
       // Reload danh sách sản phẩm
       await loadProducts();
@@ -135,6 +143,142 @@ const ProductManagement = () => {
     }
   };
 
+  // Upload một ảnh đơn lẻ
+  const uploadSingleImage = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('http://localhost:8080/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const result = await response.json();
+    
+    if (result.status === 200 && result.data) {
+      return { success: true, url: result.data };
+    } else {
+      throw new Error(result.message || 'Upload thất bại');
+    }
+  };
+
+  // Upload nhiều ảnh song song với giới hạn 5 concurrent
+  const uploadImagesInParallel = async (files, maxConcurrent = 5) => {
+    const results = [];
+    const queue = [...files];
+    const activeUploads = new Set();
+    // Map để lưu thứ tự và kết quả upload: Map<index, { file, url?, error? }>
+    const uploadResults = new Map();
+    // Map để lưu thứ tự URL đã thêm: Map<url, index>
+    const urlOrderMap = new Map();
+    
+    const processNext = async () => {
+      if (queue.length === 0 && activeUploads.size === 0) {
+        // Tất cả đã upload xong, sắp xếp lại theo thứ tự ban đầu
+        const sortedResults = Array.from(uploadResults.entries())
+          .sort(([indexA], [indexB]) => indexA - indexB)
+          .filter(([_, result]) => result.success && result.url)
+          .map(([_, result]) => result.url);
+        
+        if (sortedResults.length > 0) {
+          // Sắp xếp lại imagesPreview theo thứ tự ban đầu
+          setImagesPreview((prevImages) => {
+            // Tách các URL cũ (không có trong sortedResults) và URL mới
+            const oldUrls = prevImages.filter(url => !sortedResults.includes(url));
+            
+            // Kết hợp: URL cũ + URL mới đã sắp xếp theo thứ tự
+            const finalImages = [...oldUrls, ...sortedResults];
+            setTimeout(() => {
+              form.setFieldsValue({ images: finalImages });
+            }, 0);
+            return finalImages;
+          });
+        }
+        
+        return;
+      }
+      
+      while (queue.length > 0 && activeUploads.size < maxConcurrent) {
+        const file = queue.shift();
+        const fileIndex = files.indexOf(file); // Lưu index ban đầu
+        // Tạo key duy nhất cho file dựa trên name, size và lastModified
+        const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
+        
+        // Kiểm tra xem file đã được xử lý chưa (sử dụng ref để có giá trị mới nhất)
+        if (processedFilesRef.current.has(fileKey)) {
+          continue; // Bỏ qua file đã được xử lý
+        }
+        
+        // Đánh dấu file đã được xử lý NGAY TRƯỚC KHI bắt đầu upload
+        processedFilesRef.current.add(fileKey);
+        
+        // Đánh dấu đang upload
+        setUploadingImages(prev => {
+          const newMap = new Map(prev);
+          newMap.set(fileKey, { status: 'uploading', file, index: fileIndex });
+          return newMap;
+        });
+        
+        activeUploads.add(fileKey);
+        
+        uploadSingleImage(file)
+          .then((result) => {
+            // Đánh dấu thành công
+            setUploadingImages(prev => {
+              const newMap = new Map(prev);
+              newMap.set(fileKey, { status: 'success', url: result.url, file, index: fileIndex });
+              return newMap;
+            });
+            
+            // Lưu kết quả với index
+            uploadResults.set(fileIndex, { file, success: true, url: result.url, index: fileIndex });
+            urlOrderMap.set(result.url, fileIndex);
+            
+            // Thêm vào imagesPreview ngay (để UX tốt), nhưng sẽ sắp xếp lại sau
+            setImagesPreview((prevImages) => {
+              // Kiểm tra xem URL đã tồn tại chưa
+              if (prevImages.includes(result.url)) {
+                return prevImages;
+              }
+              // Thêm vào cuối tạm thời, sẽ sắp xếp lại khi tất cả xong
+              const newImages = [...prevImages, result.url];
+              setTimeout(() => {
+                form.setFieldsValue({ images: newImages });
+              }, 0);
+              return newImages;
+            });
+            
+            results.push({ file, success: true, url: result.url });
+          })
+          .catch((error) => {
+            // Đánh dấu lỗi
+            setUploadingImages(prev => {
+              const newMap = new Map(prev);
+              newMap.set(fileKey, { status: 'error', error: error.message, file, index: fileIndex });
+              return newMap;
+            });
+            
+            // Lưu kết quả lỗi với index
+            uploadResults.set(fileIndex, { file, success: false, error: error.message, index: fileIndex });
+            
+            // Xóa khỏi processedFiles nếu lỗi để có thể thử lại
+            processedFilesRef.current.delete(fileKey);
+            
+            results.push({ file, success: false, error: error.message });
+            message.error(`Upload ảnh ${file.name} thất bại: ${error.message}`);
+          })
+          .finally(() => {
+            activeUploads.delete(fileKey);
+            // Xử lý ảnh tiếp theo
+            processNext();
+          });
+      }
+    };
+    
+    processNext();
+    return results;
+  };
+
   const handleImageUpload = async (file, fileList, field) => {
     // Kiểm tra file type
     if (!file.type.startsWith('image/')) {
@@ -142,45 +286,44 @@ const ProductManagement = () => {
       return false;
     }
     
-    // Upload ảnh lên server
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-      message.loading({ content: 'Đang upload ảnh...', key: 'upload' });
-      
-      const response = await fetch('http://localhost:8080/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (result.status === 200 && result.data) {
-        const imageUrl = result.data;
-        message.success({ content: result.message || 'Upload thành công', key: 'upload' });
+    // Nếu là thumbnail, upload đơn lẻ như cũ
+    if (field === 'thumbnail') {
+      try {
+        message.loading({ content: 'Đang upload ảnh...', key: 'uploadThumbnail' });
         
-        // Cập nhật state với URL ảnh từ server
-        if (field === 'thumbnail') {
-          setThumbnailPreview(imageUrl);
-          form.setFieldsValue({ thumbnail: imageUrl });
-        } else if (field === 'images') {
-          setImagesPreview((prevImages) => {
-            const newImages = [...prevImages, imageUrl];
-            setTimeout(() => {
-              form.setFieldsValue({ images: newImages });
-            }, 0);
-            return newImages;
-          });
+        const result = await uploadSingleImage(file);
+        
+        if (result.success) {
+          message.success({ content: 'Upload thành công', key: 'uploadThumbnail' });
+          setThumbnailPreview(result.url);
+          form.setFieldsValue({ thumbnail: result.url });
         }
-      } else {
-        message.error({ content: result.message || 'Upload thất bại', key: 'upload' });
+      } catch (error) {
+        message.error({ content: 'Lỗi khi upload ảnh: ' + error.message, key: 'uploadThumbnail' });
       }
-    } catch (error) {
-      message.error({ content: 'Lỗi khi upload ảnh: ' + error.message, key: 'upload' });
     }
+    // Nếu là ảnh mô tả, không xử lý ở đây, sẽ xử lý trong onChange
     
     return false; // Prevent auto upload
+  };
+
+  // Xử lý khi chọn nhiều ảnh
+  const handleMultipleImageUpload = async (fileList) => {
+    // Lọc file hợp lệ - KHÔNG kiểm tra processed ở đây vì đã check ở onChange
+    // File đến đây đã được xác nhận là chưa processed
+    const imageFiles = fileList.filter(file => {
+      if (!file || !file.type) {
+        return false;
+      }
+      return file.type.startsWith('image/');
+    });
+    
+    if (imageFiles.length === 0) {
+      return;
+    }
+    
+    message.info(`Đang upload ${imageFiles.length} ảnh...`);
+    await uploadImagesInParallel(imageFiles, 5);
   };
 
   const extractFileNameFromUrl = (url) => {
@@ -493,13 +636,77 @@ const ProductManagement = () => {
               label="Ảnh mô tả (có thể thêm nhiều)"
             >
               <Upload
-                beforeUpload={(file) => handleImageUpload(file, [], 'images')}
+                customRequest={({ file, onSuccess, onError }) => {
+                  // Không làm gì ở đây, chỉ để ngăn auto upload
+                  // File sẽ được xử lý trong onChange
+                }}
+                beforeUpload={(file) => {
+                  // Chỉ kiểm tra file type
+                  if (!file.type.startsWith('image/')) {
+                    message.error('Vui lòng chọn file ảnh');
+                    return false;
+                  }
+                  return false; // Prevent auto upload
+                }}
+                onChange={({ fileList }) => {
+                  // Chỉ xử lý khi có file mới được thêm vào (fileList tăng)
+                  // Lấy tất cả file có originFileObj hoặc file trực tiếp
+                  const allFiles = fileList
+                    .map(file => {
+                      const fileObj = file.originFileObj || file;
+                      return fileObj;
+                    })
+                    .filter(file => {
+                      return file && file.type && file.type.startsWith('image/');
+                    });
+                  
+                  if (allFiles.length > 0) {
+                    // Lọc các file chưa được xử lý - CHỈ CHECK, KHÔNG ĐÁNH DẤU
+                    const newFiles = allFiles.filter(file => {
+                      const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
+                      return !processedFilesRef.current.has(fileKey);
+                    });
+                    
+                    if (newFiles.length > 0) {
+                      // Gọi upload - file sẽ được đánh dấu processed TRONG uploadImagesInParallel
+                      handleMultipleImageUpload(newFiles);
+                    }
+                  }
+                }}
                 showUploadList={false}
                 accept="image/*"
+                multiple
               >
-                <Button icon={<UploadOutlined />}>Thêm ảnh mô tả</Button>
+                <Button icon={<UploadOutlined />}>Thêm ảnh mô tả (có thể chọn nhiều)</Button>
               </Upload>
-              <div style={{ marginTop: 10 }} key={`images-preview-${imagesPreview.length}`}>
+              <div style={{ marginTop: 10 }} key={`images-preview-${imagesPreview.length}-${uploadingImages.size}`}>
+                {/* Hiển thị ảnh đang upload */}
+                {Array.from(uploadingImages.entries()).map(([key, uploadInfo]) => {
+                  if (uploadInfo.status === 'uploading') {
+                    return (
+                      <div 
+                        key={key}
+                        style={{ 
+                          display: 'inline-block',
+                          position: 'relative', 
+                          border: '1px solid #d9d9d9', 
+                          borderRadius: '4px', 
+                          padding: '4px', 
+                          backgroundColor: '#f0f0f0',
+                          marginRight: 10,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <div style={{ width: 100, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '12px', color: '#999' }}>Đang upload...</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+                
+                {/* Hiển thị ảnh đã upload thành công */}
                 {Array.isArray(imagesPreview) && imagesPreview.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     {imagesPreview.map((img, index) => {
@@ -561,7 +768,7 @@ const ProductManagement = () => {
                       );
                     })}
                   </div>
-                ) : (
+                ) : uploadingImages.size === 0 && (
                   <div style={{ color: '#999', fontSize: '12px', marginTop: 5 }}>
                     Chưa có ảnh mô tả. Click nút "Thêm ảnh mô tả" để thêm.
                   </div>
