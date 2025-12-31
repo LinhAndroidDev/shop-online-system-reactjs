@@ -16,6 +16,7 @@ const ProductManagement = () => {
   const [uploadingImages, setUploadingImages] = useState(new Map()); // Map<fileKey, { status: 'uploading'|'success'|'error', url?: string, file?: File }>
   const processedFilesRef = useRef(new Set()); // Ref để track các file đã được xử lý
   const lastFileListLengthRef = useRef(0); // Track số lượng file lần trước để tránh xử lý trùng
+  const imageCacheRef = useRef(new Map()); // Cache ảnh đã load thành công: Map<url, true>
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -31,13 +32,82 @@ const ProductManagement = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Preload ảnh khi products thay đổi - với priority cao
+  useEffect(() => {
+    if (products.length > 0) {
+      const thumbnailUrls = products
+        .map(product => product.thumbnail)
+        .filter(url => url && url.startsWith('http') && !imageCacheRef.current.has(url));
+      
+      if (thumbnailUrls.length > 0) {
+        // Preload ngay lập tức với priority cao
+        preloadImages(thumbnailUrls);
+        
+        // Lưu URL vào localStorage để preload ngay khi quay lại
+        try {
+          const cachedUrls = JSON.parse(localStorage.getItem('productImageUrls') || '[]');
+          const newUrls = [...new Set([...cachedUrls, ...thumbnailUrls])];
+          localStorage.setItem('productImageUrls', JSON.stringify(newUrls));
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+      }
+    }
+  }, [products]);
+
+  // Preload ảnh từ cache khi component mount
+  useEffect(() => {
+    try {
+      const cachedUrls = JSON.parse(localStorage.getItem('productImageUrls') || '[]');
+      if (cachedUrls.length > 0) {
+        // Preload ảnh từ cache ngay khi component mount
+        preloadImages(cachedUrls);
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+
+  // Preload ảnh để cache vào browser
+  const preloadImages = (imageUrls) => {
+    const urlsToLoad = imageUrls.filter(url => 
+      url && url.startsWith('http') && !imageCacheRef.current.has(url)
+    );
+    
+    if (urlsToLoad.length === 0) return;
+    
+    // Preload tất cả ảnh song song - browser sẽ tự cache
+    urlsToLoad.forEach(url => {
+      const img = new window.Image();
+      img.onload = () => {
+        imageCacheRef.current.set(url, true);
+      };
+      img.onerror = () => {
+        // Bỏ qua lỗi
+      };
+      // Set src để trigger load và cache
+      img.src = url;
+    });
+  };
 
   const loadProducts = async () => {
     try {
       setLoading(true);
       const data = await productController.getAll();
       // Tạo array mới để đảm bảo React nhận ra sự thay đổi
-      setProducts(data.map(product => ({ ...product })));
+      const productsData = data.map(product => ({ ...product }));
+      setProducts(productsData);
+      
+      // Preload tất cả ảnh thumbnail để cache - chạy ngay không đợi
+      const thumbnailUrls = productsData
+        .map(product => product.thumbnail)
+        .filter(url => url && url.startsWith('http'));
+      
+      if (thumbnailUrls.length > 0) {
+        // Preload ngay lập tức, không block UI
+        preloadImages(thumbnailUrls);
+      }
     } catch (error) {
       message.error('Lỗi khi tải danh sách sản phẩm: ' + error.message);
     } finally {
@@ -384,14 +454,43 @@ const ProductManagement = () => {
       dataIndex: 'thumbnail',
       key: 'thumbnail',
       width: 100,
-      render: (text) => (
-        <Image
-          width={50}
-          height={50}
-          src={text || 'https://via.placeholder.com/50'}
-          style={{ objectFit: 'cover' }}
-        />
-      ),
+      render: (text) => {
+        const imageUrl = text || 'https://via.placeholder.com/50';
+        const isCached = imageCacheRef.current.has(imageUrl);
+        
+        return (
+          <Image
+            width={50}
+            height={50}
+            src={imageUrl}
+            style={{ objectFit: 'cover' }}
+            loading={isCached ? undefined : 'lazy'}
+            preview={{
+              mask: 'Xem ảnh',
+            }}
+            placeholder={
+              <div style={{ 
+                width: 50, 
+                height: 50, 
+                backgroundColor: '#f0f0f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '10px',
+                color: '#999'
+              }}>
+                Loading...
+              </div>
+            }
+            onLoad={() => {
+              // Đánh dấu ảnh đã load thành công
+              if (imageUrl && imageUrl.startsWith('http')) {
+                imageCacheRef.current.set(imageUrl, true);
+              }
+            }}
+          />
+        );
+      },
     },
     {
       title: 'Tên sản phẩm',
