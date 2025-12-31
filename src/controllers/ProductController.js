@@ -77,6 +77,7 @@ class ProductController {
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
         status: statusForAPI,
+        images: Array.isArray(data.images) ? data.images : [],
       };
 
       const response = await fetch(this.baseUrl, {
@@ -136,6 +137,7 @@ class ProductController {
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
         status: statusForAPI,
+        images: Array.isArray(data.images) ? data.images : [],
       };
 
       const response = await fetch(this.baseUrl, {

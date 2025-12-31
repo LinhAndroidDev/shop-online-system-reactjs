@@ -112,6 +112,7 @@ const ProductManagement = () => {
         thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
         price: values.price,
         status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
+        images: imagesPreview.length > 0 ? imagesPreview : (values.images || []), // Thêm trường images
       };
       
       if (editingProduct) {
