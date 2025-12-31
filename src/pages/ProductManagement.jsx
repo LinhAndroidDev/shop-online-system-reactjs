@@ -13,6 +13,7 @@ const ProductManagement = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [imagesPreview, setImagesPreview] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -28,16 +29,26 @@ const ProductManagement = () => {
   }, []);
 
 
-  const loadProducts = () => {
-    const data = productController.getAll();
-    // Tạo array mới để đảm bảo React nhận ra sự thay đổi
-    // Map lại để đảm bảo mỗi object là một instance mới
-    setProducts(data.map(product => ({ ...product })));
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await productController.getAll();
+      // Tạo array mới để đảm bảo React nhận ra sự thay đổi
+      setProducts(data.map(product => ({ ...product })));
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách sản phẩm: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadCategories = () => {
-    const data = categoryController.getAll();
-    setCategories(data);
+  const loadCategories = async () => {
+    try {
+      const data = await categoryController.getAll();
+      setCategories(data);
+    } catch (error) {
+      message.error('Lỗi khi tải danh sách danh mục: ' + error.message);
+    }
   };
 
   const handleAdd = () => {
@@ -54,8 +65,13 @@ const ProductManagement = () => {
     const images = Array.isArray(record.images) ? record.images : [];
     setThumbnailPreview(thumbnail);
     setImagesPreview(images);
+    
+    // Convert status từ ACTIVE/INACTIVE về active/inactive cho form
+    const statusForForm = record.status?.toLowerCase() || 'active';
+    
     form.setFieldsValue({
       ...record,
+      status: statusForForm,
       thumbnail: thumbnail,
       images: images,
     });
@@ -66,12 +82,17 @@ const ProductManagement = () => {
     Modal.confirm({
       title: 'Xác nhận xóa',
       content: 'Bạn có chắc chắn muốn xóa sản phẩm này?',
-      onOk: () => {
-        if (productController.delete(id)) {
-          message.success('Xóa sản phẩm thành công');
+      onOk: async () => {
+        try {
+          const result = await productController.delete(id);
+          if (result && result.success) {
+            message.success(result.message || 'Xóa sản phẩm thành công');
+          } else {
+            message.success('Xóa sản phẩm thành công');
+          }
           loadProducts();
-        } else {
-          message.error('Xóa sản phẩm thất bại');
+        } catch (error) {
+          message.error('Xóa sản phẩm thất bại: ' + error.message);
         }
       },
     });
@@ -80,77 +101,126 @@ const ProductManagement = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      
       // Đảm bảo thumbnail và images từ preview state được lưu
       // Sử dụng thumbnailPreview nếu có, nếu không thì dùng values.thumbnail
       // Nếu thumbnailPreview được set thành null (đã xóa), thì dùng empty string
       const submitData = {
-        ...values,
+        categoryId: values.categoryId,
+        name: values.name,
+        description: values.description || '',
         thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
-        images: imagesPreview.length > 0 ? imagesPreview : (values.images || []),
+        price: values.price,
+        status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
       };
       
       if (editingProduct) {
-        productController.update(editingProduct.id, submitData);
+        await productController.update(editingProduct.id, submitData);
         message.success('Cập nhật sản phẩm thành công');
       } else {
-        productController.create(submitData);
+        await productController.create(submitData);
         message.success('Thêm sản phẩm thành công');
       }
       setIsModalVisible(false);
       setThumbnailPreview(null);
       setImagesPreview([]);
       form.resetFields();
-      // Force reload để đảm bảo UI được cập nhật
-      setTimeout(() => {
-        loadProducts();
-      }, 100);
+      // Reload danh sách sản phẩm
+      await loadProducts();
     } catch (error) {
-      // Validation failed
+      console.error('Submit error:', error);
+      const errorMessage = error.message || 'Có lỗi xảy ra khi lưu sản phẩm';
+      message.error(errorMessage);
     }
   };
 
-  const handleImageUpload = (file, fileList, field) => {
+  const handleImageUpload = async (file, fileList, field) => {
     // Kiểm tra file type
     if (!file.type.startsWith('image/')) {
       message.error('Vui lòng chọn file ảnh');
       return false;
     }
     
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const imageData = e.target.result;
+    // Upload ảnh lên server
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      message.loading({ content: 'Đang upload ảnh...', key: 'upload' });
       
-      // Sử dụng setTimeout để đảm bảo cập nhật state ngoài quá trình render
-      setTimeout(() => {
+      const response = await fetch('http://localhost:8080/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.status === 200 && result.data) {
+        const imageUrl = result.data;
+        message.success({ content: result.message || 'Upload thành công', key: 'upload' });
+        
+        // Cập nhật state với URL ảnh từ server
         if (field === 'thumbnail') {
-          setThumbnailPreview(imageData);
-          form.setFieldsValue({ thumbnail: imageData });
+          setThumbnailPreview(imageUrl);
+          form.setFieldsValue({ thumbnail: imageUrl });
         } else if (field === 'images') {
-          // Sử dụng functional update để đảm bảo lấy state mới nhất
           setImagesPreview((prevImages) => {
-            const newImages = [...prevImages, imageData];
-            // Cập nhật form value sau khi state đã được cập nhật
+            const newImages = [...prevImages, imageUrl];
             setTimeout(() => {
               form.setFieldsValue({ images: newImages });
             }, 0);
             return newImages;
           });
         }
-      }, 0);
-    };
-    reader.onerror = () => {
-      message.error('Lỗi khi đọc file ảnh');
-    };
-    reader.readAsDataURL(file);
+      } else {
+        message.error({ content: result.message || 'Upload thất bại', key: 'upload' });
+      }
+    } catch (error) {
+      message.error({ content: 'Lỗi khi upload ảnh: ' + error.message, key: 'upload' });
+    }
+    
     return false; // Prevent auto upload
   };
 
-  const handleRemoveImage = (index) => {
-    // Sử dụng functional update để tránh lỗi state transition
+  const extractFileNameFromUrl = (url) => {
+    if (!url) return null;
+    // Lấy phần cuối cùng sau dấu / cuối cùng
+    const parts = url.split('/');
+    return parts[parts.length - 1];
+  };
+
+  const handleRemoveImage = async (index) => {
+    const imageUrl = imagesPreview[index];
+    
+    // Nếu ảnh đã được upload lên server (có URL từ server), xóa trên server
+    if (imageUrl && imageUrl.startsWith('http')) {
+      const fileName = extractFileNameFromUrl(imageUrl);
+      
+      if (fileName) {
+        try {
+          message.loading({ content: 'Đang xóa ảnh...', key: 'delete' });
+          
+          const response = await fetch(`http://localhost:8080/api/upload?fileName=${encodeURIComponent(fileName)}`, {
+            method: 'DELETE',
+          });
+          
+          const result = await response.json();
+          
+          if (result.status === 200) {
+            message.success({ content: result.message || 'Xóa thành công', key: 'delete' });
+          } else {
+            message.error({ content: result.message || 'Xóa thất bại', key: 'delete' });
+          }
+        } catch (error) {
+          message.error({ content: 'Lỗi khi xóa ảnh: ' + error.message, key: 'delete' });
+        }
+      }
+    }
+    
+    // Xóa ảnh khỏi state
     setImagesPreview((prevImages) => {
       const newImages = [...prevImages];
       newImages.splice(index, 1);
-      // Cập nhật form value sau khi state đã được cập nhật
       setTimeout(() => {
         form.setFieldsValue({ images: newImages });
       }, 0);
@@ -199,11 +269,14 @@ const ProductManagement = () => {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
-        <Tag color={status === 'active' ? colors.status.active : colors.status.inactive}>
-          {status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-        </Tag>
-      ),
+      render: (status) => {
+        const statusLower = status?.toLowerCase();
+        return (
+          <Tag color={statusLower === 'active' ? colors.status.active : colors.status.inactive}>
+            {statusLower === 'active' ? 'Hoạt động' : 'Không hoạt động'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Thao tác',
@@ -258,6 +331,7 @@ const ProductManagement = () => {
           pagination={{ pageSize: 10 }}
           scroll={{ x: 'max-content' }}
           size="small"
+          loading={loading}
         />
 
         <Modal
@@ -379,7 +453,32 @@ const ProductManagement = () => {
                         transition: 'opacity 0.3s ease',
                         zIndex: 10
                       }}
-                      onClick={() => {
+                      onClick={async () => {
+                        // Nếu ảnh đã được upload lên server, xóa trên server
+                        if (thumbnailPreview && thumbnailPreview.startsWith('http')) {
+                          const fileName = extractFileNameFromUrl(thumbnailPreview);
+                          
+                          if (fileName) {
+                            try {
+                              message.loading({ content: 'Đang xóa ảnh...', key: 'deleteThumbnail' });
+                              
+                              const response = await fetch(`http://localhost:8080/api/upload?fileName=${encodeURIComponent(fileName)}`, {
+                                method: 'DELETE',
+                              });
+                              
+                              const result = await response.json();
+                              
+                              if (result.status === 200) {
+                                message.success({ content: result.message || 'Xóa thành công', key: 'deleteThumbnail' });
+                              } else {
+                                message.error({ content: result.message || 'Xóa thất bại', key: 'deleteThumbnail' });
+                              }
+                            } catch (error) {
+                              message.error({ content: 'Lỗi khi xóa ảnh: ' + error.message, key: 'deleteThumbnail' });
+                            }
+                          }
+                        }
+                        
                         setThumbnailPreview(null);
                         form.setFieldsValue({ thumbnail: '' });
                       }}
