@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, InputNumber, message, Space, Tag, Card, Statistic, Alert } from 'antd';
+import { Table, Button, Modal, Form, InputNumber, message, Space, Tag, Card, Statistic, Alert, Tooltip } from 'antd';
 import { PlusOutlined, MinusOutlined, WarningOutlined, DatabaseOutlined, FileTextOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import inventoryController from '../controllers/InventoryController';
@@ -85,6 +85,22 @@ const InventoryManagement = () => {
       title: 'Tên sản phẩm',
       dataIndex: 'productName',
       key: 'productName',
+      width: isMobile ? 120 : 300,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          <div style={{ 
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>
+            {text}
+          </div>
+        </Tooltip>
+      ),
     },
     {
       title: 'Số lượng',
@@ -159,6 +175,22 @@ const InventoryManagement = () => {
       title: 'Tên sản phẩm',
       dataIndex: 'productName',
       key: 'productName',
+      width: 300,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          <div style={{ 
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>
+            {text}
+          </div>
+        </Tooltip>
+      ),
     },
     {
       title: 'Số lượng',
@@ -192,6 +224,22 @@ const InventoryManagement = () => {
       title: 'Tên sản phẩm',
       dataIndex: 'productName',
       key: 'productName',
+      width: 300,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          <div style={{ 
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>
+            {text}
+          </div>
+        </Tooltip>
+      ),
     },
     {
       title: 'Số lượng',
@@ -278,14 +326,27 @@ const InventoryManagement = () => {
           )}
         </Space>
 
-        <Table
-          columns={columns}
-          dataSource={inventories}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 'max-content' }}
-          size="small"
-        />
+        <div style={{ 
+          overflowX: 'auto',
+        }}>
+          <style>{`
+            .ant-table-thead > tr > th:nth-child(2),
+            .ant-table-tbody > tr > td:nth-child(2) {
+              max-width: ${isMobile ? '120px' : '300px'} !important;
+              width: ${isMobile ? '120px' : '300px'} !important;
+            }
+          `}</style>
+          <Table
+            columns={columns}
+            dataSource={inventories}
+            rowKey="id"
+            pagination={{ pageSize: 10 }}
+            size="small"
+            style={{ 
+              minWidth: '100%',
+            }}
+          />
+        </div>
 
         <Modal
           title={stockType === 'in' ? 'Nhập kho' : 'Xuất kho'}

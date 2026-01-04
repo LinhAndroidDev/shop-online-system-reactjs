@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Upload, message, Space, Tag, Image } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Upload, message, Space, Tag, Image, Tooltip } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, CloseOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import productController from '../controllers/ProductController';
@@ -496,6 +496,22 @@ const ProductManagement = () => {
       title: 'Tên sản phẩm',
       dataIndex: 'name',
       key: 'name',
+      width: isMobile ? 120 : 300,
+      ellipsis: {
+        showTitle: false,
+      },
+      render: (text) => (
+        <Tooltip placement="topLeft" title={text}>
+          <div style={{ 
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            width: '100%'
+          }}>
+            {text}
+          </div>
+        </Tooltip>
+      ),
     },
     {
       title: 'Danh mục',
@@ -567,15 +583,28 @@ const ProductManagement = () => {
           </Button>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={products}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 'max-content' }}
-          size="small"
-          loading={loading}
-        />
+        <div style={{ 
+          overflowX: 'auto',
+        }}>
+          <style>{`
+            .ant-table-thead > tr > th:nth-child(2),
+            .ant-table-tbody > tr > td:nth-child(2) {
+              max-width: ${isMobile ? '120px' : '300px'} !important;
+              width: ${isMobile ? '120px' : '300px'} !important;
+            }
+          `}</style>
+          <Table
+            columns={columns}
+            dataSource={products}
+            rowKey="id"
+            pagination={{ pageSize: 10 }}
+            size="small"
+            loading={loading}
+            style={{ 
+              minWidth: '100%',
+            }}
+          />
+        </div>
 
         <Modal
           title={editingProduct ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
