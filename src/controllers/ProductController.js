@@ -68,7 +68,7 @@ class ProductController {
       const statusForAPI = (statusValue === 'active' || statusValue === 'hoạt động') 
         ? 'ACTIVE' 
         : 'INACTIVE';
-      const discountRaw = data.discountCode;
+      const discountRaw = data.discount;
       const discountNumber = (discountRaw === undefined || discountRaw === null || discountRaw === '')
         ? null
         : Number(discountRaw);
@@ -80,9 +80,12 @@ class ProductController {
         description: data.description || '',
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
-        discountCode: Number.isFinite(discountNumber) ? discountNumber : null,
+        discount: Number.isFinite(discountNumber) ? discountNumber : null,
+        origin: data.origin || '',
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
+        sizes: Array.isArray(data.sizes) ? data.sizes : [],
+        colors: Array.isArray(data.colors) ? data.colors : [],
       };
 
       const response = await fetch(this.baseUrl, {
@@ -132,7 +135,7 @@ class ProductController {
       const statusForAPI = (statusValue === 'active' || statusValue === 'hoạt động') 
         ? 'ACTIVE' 
         : 'INACTIVE';
-      const discountRaw = data.discountCode;
+      const discountRaw = data.discount;
       const discountNumber = (discountRaw === undefined || discountRaw === null || discountRaw === '')
         ? null
         : Number(discountRaw);
@@ -145,9 +148,12 @@ class ProductController {
         description: data.description || '',
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
-        discountCode: Number.isFinite(discountNumber) ? discountNumber : null,
+        discount: Number.isFinite(discountNumber) ? discountNumber : null,
+        origin: data.origin || '',
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
+        sizes: Array.isArray(data.sizes) ? data.sizes : [],
+        colors: Array.isArray(data.colors) ? data.colors : [],
       };
 
       const response = await fetch(this.baseUrl, {

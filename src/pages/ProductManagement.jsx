@@ -63,6 +63,17 @@ const ProductManagement = () => {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // State cho quản lý kích thước
+  const [sizes, setSizes] = useState([]);
+  const [sizeInput, setSizeInput] = useState('');
+  const [editingSizeIndex, setEditingSizeIndex] = useState(null);
+  
+  // State cho quản lý màu sắc
+  const [productColors, setProductColors] = useState([]);
+  const [colorInput, setColorInput] = useState('');
+  const [colorHex, setColorHex] = useState('#000000');
+  const [editingColorIndex, setEditingColorIndex] = useState(null);
 
   useEffect(() => {
     loadProducts();
@@ -174,6 +185,13 @@ const ProductManagement = () => {
     setUploadingImages(new Map());
     processedFilesRef.current.clear();
     lastFileListLengthRef.current = 0;
+    setSizes([]);
+    setProductColors([]);
+    setSizeInput('');
+    setColorInput('');
+    setColorHex('#000000');
+    setEditingSizeIndex(null);
+    setEditingColorIndex(null);
     form.resetFields();
     setIsModalVisible(true);
   };
@@ -185,17 +203,124 @@ const ProductManagement = () => {
     setThumbnailPreview(thumbnail);
     setImagesPreview(images);
     
+    // Load sizes và colors từ record
+    const recordSizes = Array.isArray(record.sizes) ? record.sizes : [];
+    const recordColors = Array.isArray(record.colors) ? record.colors : [];
+    setSizes(recordSizes);
+    setProductColors(recordColors);
+    
+    // Reset form inputs
+    setSizeInput('');
+    setColorInput('');
+    setColorHex('#000000');
+    setEditingSizeIndex(null);
+    setEditingColorIndex(null);
+    
     // Convert status từ ACTIVE/INACTIVE về active/inactive cho form
     const statusForForm = record.status?.toLowerCase() || 'active';
     
     form.setFieldsValue({
       ...record,
       status: statusForForm,
-      discountCode: record.discountCode ?? null,
+      discount: record.discount ?? null,
       thumbnail: thumbnail,
       images: images,
     });
     setIsModalVisible(true);
+  };
+  
+  // Hàm xử lý kích thước
+  const handleAddSize = () => {
+    if (!sizeInput.trim()) {
+      message.warning('Vui lòng nhập kích thước');
+      return;
+    }
+    
+    if (editingSizeIndex !== null) {
+      // Sửa kích thước
+      const newSizes = [...sizes];
+      newSizes[editingSizeIndex] = sizeInput.trim();
+      setSizes(newSizes);
+      setEditingSizeIndex(null);
+      message.success('Cập nhật kích thước thành công');
+    } else {
+      // Thêm kích thước mới
+      if (sizes.includes(sizeInput.trim())) {
+        message.warning('Kích thước này đã tồn tại');
+        return;
+      }
+      setSizes([...sizes, sizeInput.trim()]);
+      message.success('Thêm kích thước thành công');
+    }
+    setSizeInput('');
+  };
+  
+  const handleEditSize = (index) => {
+    setSizeInput(sizes[index]);
+    setEditingSizeIndex(index);
+  };
+  
+  const handleDeleteSize = (index) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa',
+      content: 'Bạn có chắc chắn muốn xóa kích thước này?',
+      onOk: () => {
+        const newSizes = sizes.filter((_, i) => i !== index);
+        setSizes(newSizes);
+        message.success('Xóa kích thước thành công');
+      },
+    });
+  };
+  
+  // Hàm xử lý màu sắc
+  const handleAddColor = () => {
+    if (!colorInput.trim()) {
+      message.warning('Vui lòng nhập tên màu');
+      return;
+    }
+    
+    const colorData = {
+      name: colorInput.trim(),
+      hex: colorHex,
+    };
+    
+    if (editingColorIndex !== null) {
+      // Sửa màu
+      const newColors = [...productColors];
+      newColors[editingColorIndex] = colorData;
+      setProductColors(newColors);
+      setEditingColorIndex(null);
+      message.success('Cập nhật màu thành công');
+    } else {
+      // Thêm màu mới
+      if (productColors.some(c => c.name === colorData.name)) {
+        message.warning('Màu này đã tồn tại');
+        return;
+      }
+      setProductColors([...productColors, colorData]);
+      message.success('Thêm màu thành công');
+    }
+    setColorInput('');
+    setColorHex('#000000');
+  };
+  
+  const handleEditColor = (index) => {
+    const color = productColors[index];
+    setColorInput(color.name);
+    setColorHex(color.hex || '#000000');
+    setEditingColorIndex(index);
+  };
+  
+  const handleDeleteColor = (index) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa',
+      content: 'Bạn có chắc chắn muốn xóa màu này?',
+      onOk: () => {
+        const newColors = productColors.filter((_, i) => i !== index);
+        setProductColors(newColors);
+        message.success('Xóa màu thành công');
+      },
+    });
   };
 
   const handleDelete = (id) => {
@@ -231,12 +356,14 @@ const ProductManagement = () => {
         description: values.description || '',
         thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
         price: values.price,
-        discountCode: (values.discountCode === undefined || values.discountCode === null || values.discountCode === '') 
-          ? '' 
-          : values.discountCode,
+        discount: (values.discount === undefined || values.discount === null || values.discount === '') 
+          ? null 
+          : Number(values.discount),
         origin: values.origin || '',
         status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
         images: imagesPreview.length > 0 ? imagesPreview : (values.images || []), // Thêm trường images
+        sizes: sizes, // Thêm trường sizes
+        colors: productColors, // Thêm trường colors
       };
       
       if (editingProduct) {
@@ -251,6 +378,13 @@ const ProductManagement = () => {
       setImagesPreview([]);
       setUploadingImages(new Map());
       processedFilesRef.current.clear();
+      setSizes([]);
+      setProductColors([]);
+      setSizeInput('');
+      setColorInput('');
+      setColorHex('#000000');
+      setEditingSizeIndex(null);
+      setEditingColorIndex(null);
       form.resetFields();
       // Reload danh sách sản phẩm
       await loadProducts();
@@ -719,8 +853,8 @@ const ProductManagement = () => {
               />
             </Form.Item>
             <Form.Item
-              name="discountCode"
-              label="Mã giảm"
+              name="discount"
+              label="Giảm giá (%)"
               rules={[
                 {
                   validator: (_, value) => {
@@ -730,17 +864,19 @@ const ProductManagement = () => {
                     if (typeof value === 'number' && !Number.isNaN(value)) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Mã giảm phải là số'));
+                    return Promise.reject(new Error('Giảm giá phải là số'));
                   },
                 },
               ]}
             >
               <InputNumber
                 style={{ width: '100%' }}
-                placeholder="Nhập mã giảm giá (nếu có)"
+                placeholder="Nhập phần trăm giảm giá (nếu có)"
                 min={0}
+                max={100}
                 formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={value => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
+                addonAfter="%"
               />
             </Form.Item>
             <Form.Item
@@ -790,6 +926,128 @@ const ProductManagement = () => {
                 ))}
               </Select>
             </Form.Item>
+            
+            {/* Quản lý Kích thước */}
+            <Form.Item label="Kích thước">
+              <div style={{ marginBottom: 16 }}>
+                <Space.Compact style={{ width: '100%', marginBottom: 12 }}>
+                  <Input
+                    placeholder="Nhập kích thước (ví dụ: S, M, L, XL)"
+                    value={sizeInput}
+                    onChange={(e) => setSizeInput(e.target.value)}
+                    onPressEnter={handleAddSize}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    type="primary"
+                    onClick={handleAddSize}
+                    icon={<PlusOutlined />}
+                  >
+                    {editingSizeIndex !== null ? 'Cập nhật' : 'Thêm'}
+                  </Button>
+                </Space.Compact>
+                
+                {sizes.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {sizes.map((size, index) => (
+                      <Tag
+                        key={index}
+                        closable
+                        onClose={() => handleDeleteSize(index)}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => handleEditSize(index)}
+                      >
+                        {size}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Form.Item>
+            
+            {/* Quản lý Màu sắc */}
+            <Form.Item label="Màu sắc">
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label style={{ whiteSpace: 'nowrap' }}>Chọn màu:</label>
+                    <input
+                      type="color"
+                      value={colorHex}
+                      onChange={(e) => setColorHex(e.target.value)}
+                      style={{
+                        width: 50,
+                        height: 32,
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        backgroundColor: colorHex,
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '4px',
+                      }}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Nhập tên màu (ví dụ: Đỏ, Xanh, Vàng)"
+                    value={colorInput}
+                    onChange={(e) => setColorInput(e.target.value)}
+                    onPressEnter={handleAddColor}
+                    style={{ flex: 1, minWidth: 200 }}
+                  />
+                  <Button
+                    type="primary"
+                    onClick={handleAddColor}
+                    icon={<PlusOutlined />}
+                  >
+                    {editingColorIndex !== null ? 'Cập nhật' : 'Thêm'}
+                  </Button>
+                </div>
+                
+                {productColors.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {productColors.map((color, index) => (
+                      <Tag
+                        key={index}
+                        closable
+                        onClose={() => handleDeleteColor(index)}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                        onClick={() => handleEditColor(index)}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 16,
+                            height: 16,
+                            backgroundColor: color.hex || '#000000',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '2px',
+                          }}
+                        />
+                        {color.name}
+                      </Tag>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Form.Item>
+            
             <Form.Item
               name="status"
               label="Trạng thái"
