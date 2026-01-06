@@ -68,6 +68,10 @@ class ProductController {
       const statusForAPI = (statusValue === 'active' || statusValue === 'hoạt động') 
         ? 'ACTIVE' 
         : 'INACTIVE';
+      const discountRaw = data.discountCode;
+      const discountNumber = (discountRaw === undefined || discountRaw === null || discountRaw === '')
+        ? null
+        : Number(discountRaw);
       
       // Đảm bảo categoryId là số nếu có thể
       const requestData = {
@@ -76,6 +80,7 @@ class ProductController {
         description: data.description || '',
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
+        discountCode: Number.isFinite(discountNumber) ? discountNumber : null,
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
       };
@@ -127,6 +132,10 @@ class ProductController {
       const statusForAPI = (statusValue === 'active' || statusValue === 'hoạt động') 
         ? 'ACTIVE' 
         : 'INACTIVE';
+      const discountRaw = data.discountCode;
+      const discountNumber = (discountRaw === undefined || discountRaw === null || discountRaw === '')
+        ? null
+        : Number(discountRaw);
       
       // Request body phải bao gồm id
       const requestData = {
@@ -136,6 +145,7 @@ class ProductController {
         description: data.description || '',
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
+        discountCode: Number.isFinite(discountNumber) ? discountNumber : null,
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
       };

@@ -191,6 +191,7 @@ const ProductManagement = () => {
     form.setFieldsValue({
       ...record,
       status: statusForForm,
+      discountCode: record.discountCode ?? null,
       thumbnail: thumbnail,
       images: images,
     });
@@ -230,6 +231,9 @@ const ProductManagement = () => {
         description: values.description || '',
         thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
         price: values.price,
+        discountCode: (values.discountCode === undefined || values.discountCode === null || values.discountCode === '') 
+          ? '' 
+          : values.discountCode,
         origin: values.origin || '',
         status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
         images: imagesPreview.length > 0 ? imagesPreview : (values.images || []), // Thêm trường images
@@ -694,14 +698,49 @@ const ProductManagement = () => {
             <Form.Item
               name="price"
               label="Giá"
-              rules={[{ required: true, message: 'Vui lòng nhập giá' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập giá' },
+                {
+                  validator: (_, value) => {
+                    if (typeof value === 'number' && !Number.isNaN(value)) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Giá phải là số hợp lệ'));
+                  },
+                },
+              ]}
             >
               <InputNumber
                 style={{ width: '100%' }}
                 placeholder="Nhập giá"
                 min={0}
                 formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                parser={value => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
+              />
+            </Form.Item>
+            <Form.Item
+              name="discountCode"
+              label="Mã giảm"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    if (value === undefined || value === null || value === '') {
+                      return Promise.resolve();
+                    }
+                    if (typeof value === 'number' && !Number.isNaN(value)) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Mã giảm phải là số'));
+                  },
+                },
+              ]}
+            >
+              <InputNumber
+                style={{ width: '100%' }}
+                placeholder="Nhập mã giảm giá (nếu có)"
+                min={0}
+                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={value => (value ? value.replace(/\$\s?|(,*)/g, '') : '')}
               />
             </Form.Item>
             <Form.Item
