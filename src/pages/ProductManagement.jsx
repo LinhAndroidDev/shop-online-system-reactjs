@@ -6,6 +6,49 @@ import productController from '../controllers/ProductController';
 import categoryController from '../controllers/CategoryController';
 import colors from '../config/colors';
 
+// Danh sách quốc gia với cờ
+const countries = [
+  { code: 'VN', name: 'Việt Nam', flag: '🇻🇳' },
+  { code: 'US', name: 'Hoa Kỳ', flag: '🇺🇸' },
+  { code: 'CN', name: 'Trung Quốc', flag: '🇨🇳' },
+  { code: 'JP', name: 'Nhật Bản', flag: '🇯🇵' },
+  { code: 'KR', name: 'Hàn Quốc', flag: '🇰🇷' },
+  { code: 'TH', name: 'Thái Lan', flag: '🇹🇭' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'MY', name: 'Malaysia', flag: '🇲🇾' },
+  { code: 'ID', name: 'Indonesia', flag: '🇮🇩' },
+  { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
+  { code: 'DE', name: 'Đức', flag: '🇩🇪' },
+  { code: 'FR', name: 'Pháp', flag: '🇫🇷' },
+  { code: 'GB', name: 'Anh', flag: '🇬🇧' },
+  { code: 'IT', name: 'Ý', flag: '🇮🇹' },
+  { code: 'ES', name: 'Tây Ban Nha', flag: '🇪🇸' },
+  { code: 'AU', name: 'Úc', flag: '🇦🇺' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'IN', name: 'Ấn Độ', flag: '🇮🇳' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'RU', name: 'Nga', flag: '🇷🇺' },
+  { code: 'TW', name: 'Đài Loan', flag: '🇹🇼' },
+  { code: 'HK', name: 'Hồng Kông', flag: '🇭🇰' },
+  { code: 'NL', name: 'Hà Lan', flag: '🇳🇱' },
+  { code: 'BE', name: 'Bỉ', flag: '🇧🇪' },
+  { code: 'CH', name: 'Thụy Sĩ', flag: '🇨🇭' },
+  { code: 'SE', name: 'Thụy Điển', flag: '🇸🇪' },
+  { code: 'NO', name: 'Na Uy', flag: '🇳🇴' },
+  { code: 'DK', name: 'Đan Mạch', flag: '🇩🇰' },
+  { code: 'FI', name: 'Phần Lan', flag: '🇫🇮' },
+  { code: 'PL', name: 'Ba Lan', flag: '🇵🇱' },
+  { code: 'TR', name: 'Thổ Nhĩ Kỳ', flag: '🇹🇷' },
+  { code: 'SA', name: 'Ả Rập Xê Út', flag: '🇸🇦' },
+  { code: 'AE', name: 'UAE', flag: '🇦🇪' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  { code: 'AR', name: 'Argentina', flag: '🇦🇷' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
+  { code: 'ZA', name: 'Nam Phi', flag: '🇿🇦' },
+  { code: 'EG', name: 'Ai Cập', flag: '🇪🇬' },
+  { code: 'IL', name: 'Israel', flag: '🇮🇱' },
+];
+
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -187,6 +230,7 @@ const ProductManagement = () => {
         description: values.description || '',
         thumbnail: thumbnailPreview !== undefined ? (thumbnailPreview || '') : (values.thumbnail || ''),
         price: values.price,
+        origin: values.origin || '',
         status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
         images: imagesPreview.length > 0 ? imagesPreview : (values.images || []), // Thêm trường images
       };
@@ -659,6 +703,53 @@ const ProductManagement = () => {
                 formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={value => value.replace(/\$\s?|(,*)/g, '')}
               />
+            </Form.Item>
+            <Form.Item
+              name="origin"
+              label="Xuất xứ"
+            >
+              <Select
+                placeholder="Chọn quốc gia xuất xứ"
+                showSearch
+                filterOption={(input, option) => {
+                  const searchText = input.toLowerCase().trim();
+                  if (!searchText) return true;
+                  
+                  // Tìm quốc gia trong mảng countries dựa trên value (country code)
+                  const countryCode = option?.value;
+                  const country = countries.find(c => c.code === countryCode);
+                  
+                  if (country) {
+                    // Tìm kiếm theo tên quốc gia (không dấu và có dấu)
+                    const nameLower = country.name.toLowerCase();
+                    const codeLower = country.code.toLowerCase();
+                    
+                    // Tìm kiếm trong tên quốc gia
+                    if (nameLower.includes(searchText)) {
+                      return true;
+                    }
+                    
+                    // Tìm kiếm trong mã quốc gia
+                    if (codeLower.includes(searchText)) {
+                      return true;
+                    }
+                  }
+                  
+                  return false;
+                }}
+                optionLabelProp="label"
+              >
+                {countries.map(country => (
+                  <Select.Option 
+                    key={country.code} 
+                    value={country.code}
+                    label={`${country.flag} ${country.name}`}
+                  >
+                    <span style={{ marginRight: 8 }}>{country.flag}</span>
+                    {country.name}
+                  </Select.Option>
+                ))}
+              </Select>
             </Form.Item>
             <Form.Item
               name="status"
