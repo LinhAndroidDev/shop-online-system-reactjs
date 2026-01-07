@@ -203,9 +203,19 @@ const ProductManagement = () => {
     setThumbnailPreview(thumbnail);
     setImagesPreview(images);
     
-    // Load sizes và colors từ record
-    const recordSizes = Array.isArray(record.sizes) ? record.sizes : [];
-    const recordColors = Array.isArray(record.colors) ? record.colors : [];
+    // Load sizes và colors từ record.variant (hoặc fallback về record.sizes/colors nếu không có variant)
+    const variant = record.variant;
+    const recordSizes = variant?.size 
+      ? Array.isArray(variant.size) ? variant.size : []
+      : (Array.isArray(record.sizes) ? record.sizes : []);
+    const recordColors = variant?.color
+      ? Array.isArray(variant.color) 
+          ? variant.color.map(c => ({
+              name: c.name || '',
+              hex: c.hexCode || c.hex || '#000000'
+            }))
+          : []
+      : (Array.isArray(record.colors) ? record.colors : []);
     setSizes(recordSizes);
     setProductColors(recordColors);
     
@@ -225,6 +235,7 @@ const ProductManagement = () => {
       discount: record.discount ?? null,
       thumbnail: thumbnail,
       images: images,
+      origin: variant?.origin || record.origin || '', // Load origin từ variant
     });
     setIsModalVisible(true);
   };
@@ -350,6 +361,24 @@ const ProductManagement = () => {
       // Đảm bảo thumbnail và images từ preview state được lưu
       // Sử dụng thumbnailPreview nếu có, nếu không thì dùng values.thumbnail
       // Nếu thumbnailPreview được set thành null (đã xóa), thì dùng empty string
+      
+      // Tạo variant object từ origin, sizes, colors
+      const variantData = {
+        origin: values.origin || '',
+        size: Array.isArray(sizes) ? sizes : [],
+        color: Array.isArray(productColors) 
+          ? productColors.map(color => ({
+              name: color.name || '',
+              hexCode: color.hex || color.hexCode || '#000000'
+            }))
+          : []
+      };
+      
+      // Nếu có variant id từ editing product, thêm vào
+      if (editingProduct?.variant?.id) {
+        variantData.id = editingProduct.variant.id;
+      }
+      
       const submitData = {
         categoryId: values.categoryId,
         name: values.name,
@@ -359,11 +388,9 @@ const ProductManagement = () => {
         discount: (values.discount === undefined || values.discount === null || values.discount === '') 
           ? null 
           : Number(values.discount),
-        origin: values.origin || '',
         status: values.status || 'active', // Sẽ được convert sang ACTIVE/INACTIVE trong controller
         images: imagesPreview.length > 0 ? imagesPreview : (values.images || []), // Thêm trường images
-        sizes: sizes, // Thêm trường sizes
-        colors: productColors, // Thêm trường colors
+        variant: variantData, // Gửi variant object
       };
       
       if (editingProduct) {

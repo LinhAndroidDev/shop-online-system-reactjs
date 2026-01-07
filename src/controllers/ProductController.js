@@ -16,12 +16,14 @@ class ProductController {
       if (result.status === 200 && Array.isArray(result.data)) {
         // Map dữ liệu từ API để thêm categoryName
         // Sử dụng category từ API response, không cần gọi getById
+        // variant object từ API response sẽ được giữ nguyên nhờ spread operator (...product)
         return result.data.map(product => {
           return {
             ...product,
             categoryId: product.category?.id || product.categoryId,
             categoryName: product.category?.name || 'N/A',
             status: product.status?.toLowerCase() || product.status, // Convert ACTIVE -> active for UI
+            // variant: product.variant sẽ được giữ nguyên từ API response
           };
         });
       }
@@ -40,11 +42,13 @@ class ProductController {
       if (result.status === 200 && result.data) {
         const product = result.data;
         // Sử dụng category từ API response
+        // variant object từ API response sẽ được giữ nguyên nhờ spread operator (...product)
         return {
           ...product,
           categoryId: product.category?.id || product.categoryId,
           categoryName: product.category?.name || 'N/A',
           status: product.status?.toLowerCase() || product.status,
+          // variant: product.variant sẽ được giữ nguyên từ API response
         };
       }
       return null;
@@ -73,6 +77,19 @@ class ProductController {
         ? null
         : Number(discountRaw);
       
+      // Xử lý variant object
+      const variantData = data.variant || {};
+      const variant = {
+        origin: variantData.origin || '',
+        size: Array.isArray(variantData.size) ? variantData.size : [],
+        color: Array.isArray(variantData.color) ? variantData.color : [],
+      };
+      
+      // Nếu có variant id, thêm vào
+      if (variantData.id) {
+        variant.id = variantData.id;
+      }
+      
       // Đảm bảo categoryId là số nếu có thể
       const requestData = {
         categoryId: Number(data.categoryId) || data.categoryId,
@@ -81,11 +98,9 @@ class ProductController {
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
         discount: Number.isFinite(discountNumber) ? discountNumber : null,
-        origin: data.origin || '',
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
-        sizes: Array.isArray(data.sizes) ? data.sizes : [],
-        colors: Array.isArray(data.colors) ? data.colors : [],
+        variant: variant,
       };
 
       const response = await fetch(this.baseUrl, {
@@ -140,6 +155,19 @@ class ProductController {
         ? null
         : Number(discountRaw);
       
+      // Xử lý variant object
+      const variantData = data.variant || {};
+      const variant = {
+        origin: variantData.origin || '',
+        size: Array.isArray(variantData.size) ? variantData.size : [],
+        color: Array.isArray(variantData.color) ? variantData.color : [],
+      };
+      
+      // Nếu có variant id, thêm vào
+      if (variantData.id) {
+        variant.id = variantData.id;
+      }
+      
       // Request body phải bao gồm id
       const requestData = {
         id: String(id), // Đảm bảo id là string
@@ -149,11 +177,9 @@ class ProductController {
         thumbnail: data.thumbnail || '',
         price: Number(data.price) || data.price,
         discount: Number.isFinite(discountNumber) ? discountNumber : null,
-        origin: data.origin || '',
         status: statusForAPI,
         images: Array.isArray(data.images) ? data.images : [],
-        sizes: Array.isArray(data.sizes) ? data.sizes : [],
-        colors: Array.isArray(data.colors) ? data.colors : [],
+        variant: variant,
       };
 
       const response = await fetch(this.baseUrl, {
