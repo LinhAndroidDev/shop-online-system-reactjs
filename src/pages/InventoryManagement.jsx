@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, InputNumber, message, Space, Tag, Card, Statistic, Alert, Tooltip } from 'antd';
-import { PlusOutlined, MinusOutlined, WarningOutlined, DatabaseOutlined, FileTextOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, MinusOutlined, WarningOutlined, DatabaseOutlined, FileTextOutlined, ExclamationCircleOutlined, MailOutlined } from '@ant-design/icons';
 import MainLayout from '../components/Layout/MainLayout';
 import inventoryController from '../controllers/InventoryController';
 import colors from '../config/colors';
@@ -16,6 +16,7 @@ const InventoryManagement = () => {
   const [stockType, setStockType] = useState('in'); // 'in' or 'out'
   const [stockForm] = Form.useForm();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     loadInventories();
@@ -162,6 +163,23 @@ const InventoryManagement = () => {
 
   const handleShowLowStockReport = () => {
     setIsLowStockReportVisible(true);
+  };
+
+  const handleSendEmailReport = async () => {
+    if (outOfStockItems.length === 0) {
+      message.warning('Không có sản phẩm hết hàng để gửi báo cáo');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const result = await inventoryController.sendOutOfStockReport();
+      message.success(result.message || 'Gửi báo cáo qua email thành công');
+    } catch (error) {
+      message.error('Gửi báo cáo qua email thất bại: ' + error.message);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const outOfStockColumns = [
@@ -381,6 +399,16 @@ const InventoryManagement = () => {
           footer={[
             <Button key="close" onClick={() => setIsOutOfStockReportVisible(false)}>
               Đóng
+            </Button>,
+            <Button
+              key="sendEmail"
+              type="primary"
+              icon={<MailOutlined />}
+              onClick={handleSendEmailReport}
+              loading={sendingEmail}
+              disabled={outOfStockItems.length === 0}
+            >
+              Gửi báo cáo qua email
             </Button>,
           ]}
           width={isMobile ? '95%' : 800}

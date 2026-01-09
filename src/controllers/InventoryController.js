@@ -162,6 +162,32 @@ class InventoryController {
     return inventories.filter(inv => inv.quantity === 0);
   }
 
+  async sendOutOfStockReport() {
+    try {
+      const response = await fetch('http://localhost:8080/api/email/report/out-of-stock', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      
+      if (result.status === 200) {
+        // Response format: { "data": null, "message": "Sent!", "status": 200 }
+        return { 
+          success: true, 
+          message: result.message || 'Gửi báo cáo thành công' 
+        };
+      }
+      
+      throw new Error(result.message || `Gửi báo cáo thất bại (Status: ${result.status})`);
+    } catch (error) {
+      console.error('Error sending out of stock report:', error);
+      throw error;
+    }
+  }
+
   deleteByProductId(productId) {
     const index = this.inventories.findIndex(inv => inv.productId === productId);
     if (index !== -1) {
